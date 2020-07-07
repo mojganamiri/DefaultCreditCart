@@ -1,0 +1,453 @@
+---
+title: "DefaultCreditCart"
+author: "MojganAmiri"
+date: "6/23/2020"
+output:
+  word_document: default
+  html_document: default
+---
+##Read data set& Assign the header& rename our target variable 
+```{r}
+
+```
+
+
+
+
+```{r}
+uci_creditcard <- read.csv("C:\\Users\\yastr\\OneDrive\\Desktop\\creditcardclients.csv" , header = TRUE)
+str(uci_creditcard)
+colnames(uci_creditcard) <- unlist(uci_creditcard[1,])
+uci_creditcard = uci_creditcard[-1, ]
+head(uci_creditcard)
+colnames(uci_creditcard)[colnames(uci_creditcard)=="default payment next month"] <- "default_payment"
+```
+
+## Convert to character then numeric(This is because factors are stored internally as integers with a table to give the factor level labels. Just using as.numeric will only give the internal integer codes.)
+```{r}
+uci_creditcard[, 1:25] <- sapply(uci_creditcard[, 1:25], as.character)
+uci_creditcard[, 1:25] <- sapply(uci_creditcard[, 1:25], as.numeric)
+str(uci_creditcard)
+```
+```{r}
+install.packages("lazyeval")
+install.packages("viridis")
+install.packages("corrgram")
+library(lazyeval)
+library(corrgram)
+corrgram(uci_creditcard, order=TRUE, lower.panel=panel.shade,
+         upper.panel=panel.pie, text.panel=panel.txt,
+         main="corrolation")
+```
+#correlation matrix &  find highly corolated feature 
+```{r}
+set.seed(7)
+# load the library
+library(mlbench)
+library(caret)
+correlationMatrix <- cor(uci_creditcard[,1:24])
+# summarize the correlation matrix
+print(correlationMatrix)
+# find attributes that are highly corrected (ideally >0.75)
+highlyCorrelated <- findCorrelation(correlationMatrix, cutoff=0.5)
+# print indexes of highly correlated attributes
+cat("column which are highly corrolated are :" ,highlyCorrelated)
+```
+#forward selection algorithm
+```{r}
+str(uci_creditcard)
+library(MASS)
+full <- lm(default_payment~LIMIT_BAL +SEX+ EDUCATION + MARRIAGE + 
+                                  AGE +PAY_0+PAY_2+ PAY_3+PAY_4+PAY_5+PAY_6+BILL_AMT1+
+                                  BILL_AMT2+BILL_AMT3+BILL_AMT4+BILL_AMT5+ BILL_AMT6+
+                                  PAY_AMT1+PAY_AMT2+PAY_AMT3+PAY_AMT4+PAY_AMT5+PAY_AMT6,data=uci_creditcard)
+null <- lm(default_payment~1,data=uci_creditcard)
+stepF <- stepAIC(null, scope=list(lower=null, upper=full), direction= "forward", trace=TRUE)
+summary(stepF)
+```
+#Backward selection algorithm
+```{r}
+full <- lm(default_payment~LIMIT_BAL +SEX+ EDUCATION + MARRIAGE + 
+                                  AGE +PAY_0+PAY_2+ PAY_3+PAY_4+PAY_5+PAY_6+BILL_AMT1+
+                                  BILL_AMT2+BILL_AMT3+BILL_AMT4+BILL_AMT5+ BILL_AMT6+
+                                  PAY_AMT1+PAY_AMT2+PAY_AMT3+PAY_AMT4+PAY_AMT5+PAY_AMT6,data=uci_creditcard)
+stepB <- stepAIC(full, direction= "backward", trace=TRUE)
+summary(stepB)
+```
+
+
+# Convert Sex Data (1,2) with (Male, Female)
+# Convert Education Level Data (0,1,2,3,4,5,6) with (Unknown, Graduate school, University, High school, Others, Unknown, Unknown)
+# Convert Marriage level Data (0,1,2,3) with (Unknown, Married, Single, Others)
+# Convert default.payment.next.month level Data (0,1) with (No, Yes)
+# Convert Repayment Status columns to Factors
+```{r}
+uci_creditcard$SEX <- as.factor(uci_creditcard$SEX)
+levels(uci_creditcard$SEX) <- c("Male","Female")
+
+uci_creditcard$EDUCATION <- as.factor(uci_creditcard$EDUCATION)
+levels(uci_creditcard$EDUCATION) <- c("Unknown", "Graduate School", "University", "High school", "Others", "Unknown", "Unknown")
+
+uci_creditcard$MARRIAGE <- as.factor(uci_creditcard$MARRIAGE)
+levels(uci_creditcard$MARRIAGE) <- c("Unknown" , "Married" , "Single" ,"Others")
+
+uci_creditcard$default_payment <- as.factor(uci_creditcard$default_payment)
+levels(uci_creditcard$default_payment) <- c("No" , "Yes")
+
+uci_creditcard$PAY_0 <- as.factor(uci_creditcard$PAY_0)
+uci_creditcard$PAY_2 <- as.factor(uci_creditcard$PAY_2)
+uci_creditcard$PAY_3 <- as.factor(uci_creditcard$PAY_3)
+uci_creditcard$PAY_4 <- as.factor(uci_creditcard$PAY_4)
+uci_creditcard$PAY_5 <- as.factor(uci_creditcard$PAY_5)
+uci_creditcard$PAY_6 <- as.factor(uci_creditcard$PAY_6)
+```
+
+# Summary data & Drop the ID Column & Check for Null value & dimantion of data
+```{r}
+summary(uci_creditcard)
+uci_creditcard$ID <- NULL
+sum(is.na(uci_creditcard))
+dim(uci_creditcard)      
+ncol(uci_creditcard)
+nrow(uci_creditcard)
+
+```
+#distrubution of target value 
+```{r}
+library(ggplot2)
+ggplot(uci_creditcard, aes(x=default_payment, fill = default_payment)) + 
+  geom_bar() + 
+  labs(title="Bar plot", 
+       subtitle="Clients Grouped by Default Payment",
+       caption="Source: UCI Credit Card",
+       x="Default Payment",
+       fill="Default Payment")
+```
+
+
+
+## Plot data using combination of demographic attributes
+```{r}
+library(gridExtra) 
+graph1 <- ggplot(data=uci_creditcard, aes(x=SEX,fill=SEX)) + geom_bar() +
+  labs(title = "Distribution by Gender", x ="Gender",fill = "Gender") +
+  scale_fill_manual(values=c("#56B4E9", "#FF9999")) +
+  theme(axis.text.x = element_text(angle = 45,hjust=1))
+
+graph2 <- ggplot(data=uci_creditcard, aes(x=EDUCATION,fill=EDUCATION)) + geom_bar() +
+  labs(title = "Distribution by Education Level", x ="Education Level",fill = "Education Level") +
+  theme(axis.text.x = element_text(angle = 45,hjust=1))
+
+graph3 <- ggplot(data=uci_creditcard, aes(x=MARRIAGE,fill=MARRIAGE)) + geom_bar() +
+  labs(title = "Distribution by Marital Status", x ="Marital Status",fill = "Marital Status") +
+  theme(axis.text.x = element_text(angle = 45,hjust=1))
+
+grid.arrange(graph1,graph2,graph3,ncol=2)
+```
+# Plot data using combination of demographic attributes
+```{r}
+
+graph4 <- ggplot(data=uci_creditcard, aes(x=EDUCATION,fill=SEX)) + geom_bar(position='dodge') +
+  labs(title = "Distribution by Education & Gender", x ="EDUCATION",fill = "GENDER") +
+  scale_fill_manual(values=c("#56B4E9", "#FF9999")) +
+  theme(axis.text.x = element_text(angle = 45,hjust=1))
+
+graph5 <- ggplot(data=uci_creditcard, aes(x=MARRIAGE,fill=SEX)) + geom_bar(position='dodge') +
+  labs(title = "Distribution by Marital Status & Gender", x ="Marital Status",fill = "Gender") +
+  scale_fill_manual(values=c("#56B4E9", "#FF9999")) +
+  theme(axis.text.x = element_text(angle = 45,hjust=1))
+
+graph6 <- ggplot(data=uci_creditcard, aes(x=EDUCATION,fill=MARRIAGE)) + geom_bar(position='dodge') +
+  labs(title = "Distribution by Education & Marital Status", x ="Education",fill = "Marital Status") +
+  theme(axis.text.x = element_text(angle = 45,hjust=1))
+
+grid.arrange(graph4, graph5, graph6,ncol=2)
+```
+#Plot SEX,LIMIT_BAL,EDUCATION VS default_payment
+```{r}
+graph7 <- ggplot(data=uci_creditcard, aes(x=SEX,fill=default_payment)) + geom_bar() +
+  labs( x ="Gender",fill = "defualt") +
+  scale_fill_manual(values=c("#56B4E9", "#FF9999")) +
+  theme(axis.text.x = element_text(angle = 45,hjust=1))
+
+graph8 <- ggplot(data=uci_creditcard, aes(x=LIMIT_BAL,fill=default_payment)) + geom_bar() +
+  labs(title = " Non-Defaulter vs Defaulter within Specific Credit Limit Group", x ="limit",fill = "default_payment") +
+  theme(axis.text.x = element_text(angle = 45,hjust=1))
+
+graph9 <- ggplot(data=uci_creditcard, aes(x=EDUCATION,fill=default_payment)) + geom_bar() +
+  labs(title = "Education vs Defaults Payments", x ="EDUCATION",fill = "default_payment") +
+  theme(axis.text.x = element_text(angle = 45,hjust=1))
+grid.arrange(graph7, graph8, graph9,ncol=2)
+```
+#Histogram PAY_X
+```{r}
+  pay.cols.names  <- paste0("PAY_", c(0, 2:6))
+
+cols.to.factors <- c("SEX", "EDUCATION", "MARRIAGE", 
+                     pay.cols.names, "default_payment")
+
+uci_creditcard[cols.to.factors] <- lapply(uci_creditcard[cols.to.factors], factor)
+library(ggplot2)
+pay.histograms <- 
+  lapply(pay.cols.names, 
+         function (pay.col.name){ 
+           ggplot(data = uci_creditcard[, pay.cols.names], 
+                  aes(x = uci_creditcard[, pay.col.name])) +
+             geom_bar(stat = "count") + 
+             theme_minimal() +
+             xlab(paste0("Repayment status ", pay.col.name)) +
+             ylab("Observations count")
+         })
+pay.histograms
+```
+#histogram data
+```{r}
+a<-ggplot(data = uci_creditcard, aes(x = AGE)) + 
+  geom_histogram(bins = 50, fill = "purple", col = "blue", alpha = 0.3) + 
+  labs(title = "AGE")+ 
+  scale_x_continuous(breaks = seq(min(0), max(90), by = 5), na.value = TRUE)
+
+
+b<-ggplot(data = uci_creditcard, aes(x= BILL_AMT1)) + 
+  geom_histogram(bins = 50, fill = "purple", col = "blue", alpha = 0.3) + 
+  labs(title = "BILL_AMT1")+ 
+  scale_x_continuous(breaks = seq(min(0), max(90), by = 5), na.value = TRUE)
+
+
+c<-ggplot(data = uci_creditcard, aes(x= BILL_AMT2)) + 
+  geom_histogram(bins = 50, fill = "purple", col = "blue", alpha = 0.3) + labs(title = "BILL_AMT2")+  
+  scale_x_continuous(breaks = seq(min(0), max(90), by = 5), na.value = TRUE)
+
+d<-ggplot(data = uci_creditcard, aes(x= BILL_AMT3)) + 
+  geom_histogram(bins = 50, fill = "purple", col = "blue", alpha = 0.3) +  labs(title = "BILL_AMT3")+ 
+  scale_x_continuous(breaks = seq(min(0), max(90), by = 5), na.value = TRUE)
+grid.arrange(a, b,ncol=2)
+
+e<-ggplot(data = uci_creditcard, aes(x= BILL_AMT4)) + 
+  geom_histogram(bins = 50, fill = "purple", col = "blue", alpha = 0.3) + 
+  scale_x_continuous(breaks = seq(min(0), max(90), by = 5), na.value = TRUE)
+
+
+f<-ggplot(data = uci_creditcard, aes(x= BILL_AMT5)) + 
+  geom_histogram(bins = 50, fill = "purple", col = "blue", alpha = 0.3) + 
+  scale_x_continuous(breaks = seq(min(0), max(90), by = 5), na.value = TRUE)
+
+grid.arrange(a,b,c,d,e,f,ncol=2)
+
+g<-ggplot(data = uci_creditcard, aes(x= EDUCATION)) + 
+  geom_histogram(bins = 50, fill = "purple", col = "blue", alpha = 0.3) + 
+  scale_x_continuous(breaks = seq(min(0), max(90), by = 5), na.value = TRUE)
+grid.arrange(a, b,ncol=2)
+
+h<-ggplot(data = uci_creditcard, aes(x= LIMIT_BAL)) + 
+  geom_histogram(bins = 50, fill = "purple", col = "blue", alpha = 0.3) + 
+  scale_x_continuous(breaks = seq(min(0), max(90), by = 5), na.value = TRUE)
+grid.arrange(a, b,ncol=2)
+
+grid.arrange(a,b,c,d,e,f,ncol=2)
+```
+
+
+#Feature selection by using random forest
+```{r}
+data.partition<-sample(2,nrow(uci_creditcard),replace = TRUE,prob = c(0.75,0.25))
+data.train<-uci_creditcard[data.partition==1,]
+data.test<-uci_creditcard[data.partition==2,]
+
+
+library(randomForest)
+output.forest <- randomForest(default_payment~ LIMIT_BAL +SEX+ EDUCATION + MARRIAGE + 
+                                  AGE +PAY_0 +PAY_2+ PAY_3+PAY_4+PAY_5+PAY_6+BILL_AMT1+
+                                  BILL_AMT2+BILL_AMT3+BILL_AMT4+BILL_AMT5+ BILL_AMT6+
+                                  PAY_AMT1+PAY_AMT2+PAY_AMT3+PAY_AMT4+PAY_AMT5+PAY_AMT6, data = data.train)
+
+
+
+Import.vari<-importance(output.forest)
+Import.vari
+```
+
+#implement models
+```{r}
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(rminer)
+library(ggplot2)
+library(Amelia)
+library(nnet)
+library(dummies)
+library(caTools)
+```
+#according to corrrolation&highly corrolated feature &feature selection that has been done we will remove some attribute
+```{r}
+uci_creditcard$BILL_AMT6 <- NULL
+uci_creditcard$BILL_AMT5<- NULL
+uci_creditcard$BILL_AMT4<- NULL
+uci_creditcard$BILL_AMT3<- NULL
+uci_creditcard$BILL_AMT2<- NULL
+
+uci_creditcard$PAY_2<- NULL
+uci_creditcard$PAY_3<- NULL
+uci_creditcard$PAY_4<- NULL
+uci_creditcard$PAY_5<- NULL
+uci_creditcard$PAY_6<- NULL
+str(uci_creditcard)
+```
+#Normalize Data
+```{r}
+normalize <- function(x) {
+               return ((x - min(x)) / (max(x) - min(x))) }
+
+uci_creditcard1 <- as.data.frame(lapply(uci_creditcard[7:13], normalize))
+uci_creditcard2 <- as.data.frame(lapply(uci_creditcard[1], normalize))
+uci_creditcard3 <- as.data.frame(lapply(uci_creditcard[5], normalize))
+
+uci_creditcard <- cbind(uci_creditcard2,uci_creditcard$SEX,uci_creditcard$EDUCATION,uci_creditcard$MARRIAGE,
+                        uci_creditcard3,uci_creditcard$PAY_0,uci_creditcard1,uci_creditcard$default_payment)
+
+colnames(uci_creditcard)[colnames(uci_creditcard)=="uci_creditcard$SEX"] <- "SEX"
+colnames(uci_creditcard)[colnames(uci_creditcard)=="uci_creditcard$EDUCATION"] <- "EDUCATION"
+colnames(uci_creditcard)[colnames(uci_creditcard)=="uci_creditcard$MARRIAGE"] <- "MARRIAGE"
+colnames(uci_creditcard)[colnames(uci_creditcard)=="uci_creditcard$default_payment"] <- "default_payment"
+colnames(uci_creditcard)[colnames(uci_creditcard)=="uci_creditcard$PAY_0"] <- "PAY_0"
+str(uci_creditcard)
+summary(uci_creditcard)
+```
+
+
+#Convert Factor level into dummy variable 
+```{r}
+
+SEX.dummies<-dummy(uci_creditcard$SEX,sep = '_')
+EDUCATION.dummy<-dummy(uci_creditcard$EDUCATION,sep = '_')
+MARRIAGE.dummy<-dummy(uci_creditcard$MARRIAGE,sep = '_')
+PAY_0.dummies<-dummy(uci_creditcard$PAY_0,sep = '_')
+
+
+
+uci_creditcard_clean<-cbind(uci_creditcard,MARRIAGE.dummy,SEX.dummies,EDUCATION.dummy,PAY_0.dummies)
+dim(uci_creditcard_clean)
+uci_creditcard_clean<-uci_creditcard_clean[,c(1,5,7:36)]
+dim(uci_creditcard_clean)
+str(uci_creditcard_clean)
+```
+#data partition
+```{r}
+uci_creditcard_clean_index <- sample(1:nrow(uci_creditcard_clean), 0.7 * nrow(uci_creditcard_clean))
+train.set <- uci_creditcard_clean[uci_creditcard_clean_index ,]
+test.set  <- uci_creditcard_clean[-uci_creditcard_clean_index ,]
+dim(train.set)
+dim(test.set)
+str(test.set)
+```
+#Model1 Logistic Regression
+```{r}
+StartLG<-Sys.time()
+log.model<-glm(default_payment~.,family = "binomial",train.set)
+EndLG<-Sys.time()
+
+summary(log.model)
+#confint(log.model,level=.95)
+default_predction<-predict(log.model,test.set,type='response')
+#Generate ROC curve
+model.AUC<-colAUC(default_predction,test.set$default_payment,plotROC = T)
+abline(h=model.AUC,col='Green')
+text(.2,.9,cex = .8,labels = paste("Optinonal Cutoff:",round(model.AUC,4)))
+
+#Convert probabilities to class
+default.class<-ifelse(default_predction>0.7651,1,0)
+
+#transform back to factor for comparison
+default.class<-factor(default.class)
+test.set$default_payment<-factor(test.set$default_payment)
+
+library(plyr)
+test.set$default_payment <- revalue(test.set$default_payment, c("Yes"=1))
+test.set$default_payment <- revalue(test.set$default_payment, c("No"=0))
+
+
+
+#levels(as.factor(default.class))
+#levels(as.factor(test.set$default_payment))
+
+#Confusion Matrix
+confusionMatrix(default.class,test.set$default_payment)
+
+time<-EndLG-StartLG
+cat("execution time is :",time )
+```
+####Second model Neural Network
+```{r}
+StartNN<-Sys.time()
+NNlog<-multinom(default_payment~.,data = train.set)
+EndNN<-Sys.time()
+
+summary(NNlog)
+#model Prediction
+default_predction2<-predict(NNlog,test.set)
+prediction.table<-table(default_predction2,test.set$default_payment)# put information into confusion matrix
+prediction.table #print confusion matrix
+
+#Correct Classifiction
+sum(diag((prediction.table))/sum(prediction.table))
+#Misclassification
+1-sum(diag((prediction.table))/sum(prediction.table))
+
+time<-EndNN-StartNN
+cat("execution time is :",time )
+
+```
+#partition data and manipulate in diffrent way 
+```{r}
+uci_creditcard$default_paymentF<-factor(uci_creditcard$default_payment)
+data.partition<-sample(2,nrow(uci_creditcard),replace = TRUE,prob = c(0.75,0.25))
+data.train<-uci_creditcard[data.partition==1,]
+data.test<-uci_creditcard[data.partition==2,]
+ dim(data.test)
+ str(uci_creditcard)
+```
+#Build Decision Tree
+```{r}
+StartDTree<-Sys.time()
+d.tree<-rpart(data.train$default_paymentF~data.train$LIMIT_BAL+data.train$SEX+data.train$EDUCATION+data.train$MARRIAGE+
+                data.train$PAY_0+data.train$BILL_AMT1+data.train$PAY_AMT6)
+EndDTree<-Sys.time()
+
+summary(d.tree)
+#TO plot decision tree
+rpart.plot(d.tree,extra = 3)
+
+#default predict
+tree.prediction<-predict(d.tree,data.train,type="class")
+
+#to check levels
+levels(tree.prediction)
+levels(data.test$default_paymentF)
+
+#Missclasification Matrix
+confusionMatrix(tree.prediction,data.train$default_paymentF)
+
+time<-EndDTree-StartDTree
+cat("execution time is :",time )
+```
+#forth Random forest
+```{r}
+library(randomForest)
+StartRFarest<-Sys.time()
+output.forest <- randomForest(data.train$default_paymentF~data.train$LIMIT_BAL+data.train$SEX+data.train$EDUCATION+data.train$MARRIAGE+
+                data.train$PAY_0+data.train$BILL_AMT1+data.train$PAY_AMT6,data = data.train)
+EndRFarest<-Sys.time()
+
+summary(output.forest)
+
+random.prediction<-predict(output.forest,data.train,type="class")
+levels(random.prediction)
+levels(data.test$default_paymentF)
+confusionMatrix(random.prediction,data.train$default_paymentF)
+time<-EndRFarest-StartRFarest
+cat("execution time is :",time )
+```
+
+
+
